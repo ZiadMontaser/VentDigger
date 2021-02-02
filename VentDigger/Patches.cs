@@ -21,18 +21,31 @@ namespace VentDigger
         static void OnDigPressed()
         {
             var pos = PlayerControl.LocalPlayer.transform.position;
-            int ventId = 0;
+            int ventId = GetAvailableVentId();
             int ventLeft = int.MaxValue;
             int ventCrnter = int.MaxValue;
             int ventRight = int.MaxValue;
 
             if (lastVent != null)
             {
-                ventId = lastVent.Id + 1;
                 ventLeft = lastVent.Id;
             }
 
             RpcSpawnVent(ventId , pos , ventLeft , ventCrnter , ventRight);
+        }
+
+        static int GetAvailableVentId()
+        {
+            int id = 0;
+
+            while (true)
+            {
+                if (!ShipStatus.Instance.CIAHFBANKDD.Any(v => v.Id == id))
+                {
+                    return id;
+                }
+                id++;
+            }
         }
 
         static void SpawnVent(int id ,Vector2 postion, int leftVent , int centerVent , int rightVent)
@@ -46,14 +59,9 @@ namespace VentDigger
             vent.Center = centerVent == int.MaxValue ? null : ShipStatus.Instance.CIAHFBANKDD[centerVent];
             vent.Right = rightVent == int.MaxValue ? null : ShipStatus.Instance.CIAHFBANKDD[rightVent];
 
-            Vent[] vents = new Vent[ShipStatus.Instance.CIAHFBANKDD.Count+1];
-            for(int i = 0; i < ShipStatus.Instance.CIAHFBANKDD.Count; i++)
-            {
-                vents[i] = ShipStatus.Instance.CIAHFBANKDD[i];
-            }
-            vents[id] = vent;
-
-            ShipStatus.Instance.CIAHFBANKDD = vents;
+            var allVents = ShipStatus.Instance.CIAHFBANKDD.ToList();
+            allVents.Add(vent);
+            ShipStatus.Instance.CIAHFBANKDD = allVents.ToArray();
 
             if (lastVent != null)
             {
