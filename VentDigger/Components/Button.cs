@@ -3,13 +3,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
-using HudManager = PIEFJFEOGOL;
-using KillButtonManager = MLPJGKEACMM;
-using PassiveButton = HHMBANDDIOA;
-using PlayerControl = FFGALNAPKCD;
-using ShipStatus = HLBNNHFCNAJ;
-using Vent = OPPMFCFACJB;
-
 
 namespace VentDigger
 {
@@ -25,7 +18,7 @@ namespace VentDigger
 
         float timer;
 
-        bool CanPlace = true;
+        public bool CanPlace = true;
 
         public Button(HudManager hudManager, string embeddedResourcesImage)
         {
@@ -45,7 +38,6 @@ namespace VentDigger
             buttonManager.SetCoolDown(timer, MaxTimer);
             Rest();
 
-            buttonManager.renderer.SetCooldownNormalizedUvs();
             buttonManager.transform.localPosition = new Vector3((buttonManager.transform.localPosition.x + 1.3f) * -1, buttonManager.transform.localPosition.y, buttonManager.transform.localPosition.z);
         }
 
@@ -64,51 +56,51 @@ namespace VentDigger
 
             buttonManager.transform.localPosition = new Vector3((_hudManager.UseButton.transform.localPosition.x) * -1, _hudManager.UseButton.transform.localPosition.y, _hudManager.KillButton.transform.localPosition.z) + new Vector3(0.2f, 0.2f);
 
-            List<Vent> nearVents = new List<Vent>();
-            if (ShipStatus.Instance) { 
-            }
-            {
-                if (ShipStatus.Instance.CIAHFBANKDD != null)
-                {
-                    for (int i = 0; i < ShipStatus.Instance.CIAHFBANKDD.Count; i++)
-                    {
-                        var vent = ShipStatus.Instance.CIAHFBANKDD[i];
-                        if (vent)
-                        {
-                            if (Vector2.Distance(PlayerControl.LocalPlayer.transform.position, vent.transform.position) < 2)
-                            {
-                                nearVents.Add(vent);
-                            }
-                        }
-                    }
+            //List<Vent> nearVents = new List<Vent>();
+            //if (ShipStatus.Instance) { 
+            //}
+            //{
+            //    if (ShipStatus.Instance.AllVents  != null)
+            //    {
+            //        for (int i = 0; i < ShipStatus.Instance.AllVents.Count; i++)
+            //        {
+            //            var vent = ShipStatus.Instance.AllVents[i];
+            //            if (vent)
+            //            {
+            //                if (Vector2.Distance(PlayerControl.LocalPlayer.transform.position, vent.transform.position) < 2)
+            //                {
+            //                    nearVents.Add(vent);
+            //                }
+            //            }
+            //        }
 
-                    if (nearVents.Count == 0)
-                    {
-                        CanPlace = true;
-                        //if (Patches.lastVent)
-                        //{
-                        //    if (ShipStatus.Instance.CIAHFBANKDD.Count - 1 > Patches.lastVent.Id)
-                        //    {
-                        //        CanPlace = true;
-                        //    }
-                        //    else { CanPlace = false; }
-                        //}
-                    }
-                    else
-                    {
-                        CanPlace = false;
-                    }
-                }
-            }
+            //        if (nearVents.Count == 0)
+            //        {
+            //            CanPlace = true;
+            //            //if (Patches.lastVent)
+            //            //{
+            //            //    if (ShipStatus.Instance.AllVents.Count - 1 > Patches.lastVent.Id)
+            //            //    {
+            //            //        CanPlace = true;
+            //            //    }
+            //            //    else { CanPlace = false; }
+            //            //}
+            //        }
+            //        else
+            //        {
+            //            CanPlace = false;
+            //        }
+            //    }
+            //}
 
-            if (CanPlace)
-            {
-                buttonManager.renderer.color = new Color(1f, 1f, 1f, 1f);
-            }
-            else
-            {
-                buttonManager.renderer.color = new Color(1f, 1f, 1f, 0.3f);
-            }
+            //if (CanPlace)
+            //{
+            //    buttonManager.renderer.color = new Color(1f, 1f, 1f, 1f);
+            //}
+            //else
+            //{
+            //    buttonManager.renderer.color = new Color(1f, 1f, 1f, 0.3f);
+            //}
         }
 
         bool CanUse()

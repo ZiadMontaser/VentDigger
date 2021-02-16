@@ -20,7 +20,7 @@ namespace VentDigger
             }
             catch
             {
-                Console.WriteLine("Error accessing resources!");
+                System.Console.WriteLine("Error accessing resources!");
             }
             return null;
         }
