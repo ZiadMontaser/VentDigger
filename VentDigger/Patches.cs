@@ -118,11 +118,11 @@ namespace VentDigger
                 if (!__instance.AmOwner) return;
                 if (PlayerControl.LocalPlayer.Data.IsImpostor && !PlayerControl.LocalPlayer.Data.IsDead)
                 {
-                    DigButton.buttonManager.gameObject.SetActive(true);
+                    DigButton.Enabled = (true);
                 }
                 else
                 {
-                    DigButton.buttonManager.gameObject.SetActive(false);
+                    DigButton.Enabled = (false);
                 }
             }
         }
@@ -156,7 +156,7 @@ namespace VentDigger
         [HarmonyPatch(typeof(HudManager),nameof(HudManager.Start))]
         static class DigButtonPatch
         {
-            static void Postfix(HudManager __instance)
+            [HarmonyPostfix] static void Postfix(HudManager __instance)
             {
                 DigButton = new Button(__instance, "VentDigger.Assets.DigImpostor.png");
                 DigButton.AddListener(OnDigPressed);

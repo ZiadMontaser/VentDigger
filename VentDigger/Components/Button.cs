@@ -15,10 +15,12 @@ namespace VentDigger
         private Action _onClick;
         public KillButtonManager buttonManager;
         float MaxTimer = 15;
+        public Sprite sprite;
 
         float timer;
 
         public bool CanPlace = true;
+        private bool canUse = false;
 
         public Button(HudManager hudManager, string embeddedResourcesImage)
         {
@@ -29,12 +31,23 @@ namespace VentDigger
             OnStart();
         }
 
+        public bool Enabled
+        {
+            set
+            {
+                canUse = value;
+                buttonManager.gameObject.SetActive(canUse);
+                buttonManager.renderer.sprite = sprite;
+            }
+
+            get => canUse;
+        }
+
         void OnStart()
         {
             buttonManager = GameObject.Instantiate(_hudManager.KillButton, _hudManager.transform);
-            //buttonManager.gameObject.SetActive(true);
             // Set Sprite
-            buttonManager.renderer.sprite = SpriteHelper.LoadSpriteFromEmbeddedResources(_embeddedResourcesImage, 600);
+            sprite = SpriteHelper.LoadSpriteFromEmbeddedResources(_embeddedResourcesImage, 600);
             buttonManager.SetCoolDown(timer, MaxTimer);
             Rest();
 
@@ -56,51 +69,6 @@ namespace VentDigger
 
             buttonManager.transform.localPosition = new Vector3((_hudManager.UseButton.transform.localPosition.x) * -1, _hudManager.UseButton.transform.localPosition.y, _hudManager.KillButton.transform.localPosition.z) + new Vector3(0.2f, 0.2f);
 
-            //List<Vent> nearVents = new List<Vent>();
-            //if (ShipStatus.Instance) { 
-            //}
-            //{
-            //    if (ShipStatus.Instance.AllVents  != null)
-            //    {
-            //        for (int i = 0; i < ShipStatus.Instance.AllVents.Count; i++)
-            //        {
-            //            var vent = ShipStatus.Instance.AllVents[i];
-            //            if (vent)
-            //            {
-            //                if (Vector2.Distance(PlayerControl.LocalPlayer.transform.position, vent.transform.position) < 2)
-            //                {
-            //                    nearVents.Add(vent);
-            //                }
-            //            }
-            //        }
-
-            //        if (nearVents.Count == 0)
-            //        {
-            //            CanPlace = true;
-            //            //if (Patches.lastVent)
-            //            //{
-            //            //    if (ShipStatus.Instance.AllVents.Count - 1 > Patches.lastVent.Id)
-            //            //    {
-            //            //        CanPlace = true;
-            //            //    }
-            //            //    else { CanPlace = false; }
-            //            //}
-            //        }
-            //        else
-            //        {
-            //            CanPlace = false;
-            //        }
-            //    }
-            //}
-
-            //if (CanPlace)
-            //{
-            //    buttonManager.renderer.color = new Color(1f, 1f, 1f, 1f);
-            //}
-            //else
-            //{
-            //    buttonManager.renderer.color = new Color(1f, 1f, 1f, 0.3f);
-            //}
         }
 
         bool CanUse()
@@ -114,7 +82,7 @@ namespace VentDigger
             buttonManager.renderer.material.SetFloat("_Desat", 0f);
         }
 
-        void SetMAxCoolDown(float maxTimer)
+        void SetMaxCoolDown(float maxTimer)
         {
             MaxTimer = maxTimer;
         }
