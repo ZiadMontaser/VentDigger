@@ -1,25 +1,25 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
+    <PropertyGroup>
         <TargetFramework>netstandard2.1</TargetFramework>
-        <Version>1.1.0</Version>
-        <GameVersion>2021.3.5s</GameVersion>
-        <Mappings>NuclearPowered/Mappings:0.2.0</Mappings>
+        <LangVersion>latest</LangVersion>
+        <DebugType>embedded</DebugType>
 
-        <Description>a mod which allows impostors to dig there own vent network</Description>
+        <Description>A Mod which allows impostors to dig there own vent network.</Description>
         <Authors>Zirno</Authors>
-        <Configurations>Debug;Release;Released</Configurations>
-        <Platforms>AnyCPU</Platforms>
+        <AmongUs>C:\Program Files (x86)\Steam\steamapps\common\Reactor\AU-2021.6.30s</AmongUs>
     </PropertyGroup>
-  
-  <ItemGroup>
-    <EmbeddedResource Include="Assets/**"></EmbeddedResource>
-    
-        <Deobfuscate Include="$(AmongUs)\BepInEx\plugins\Reactor-$(GameVersion).dll" />
 
-        <PackageReference Include="Reactor.OxygenFilter.MSBuild" Version="0.2.9" />
+    <PropertyGroup>
+        <GameVersion Condition="'$(GamePlatform)' == 'Steam'">2021.6.30s</GameVersion>
+        <GameVersion Condition="'$(GamePlatform)' == 'Itch'">2021.6.30i</GameVersion>
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <EmbeddedResource Include="Assets/**" />
+        <PackageReference Include="Reactor.MSBuild" Version="0.1.5" PrivateAssets="all" />
     </ItemGroup>
 
-    <Target Name="Copy" AfterTargets="Reobfuscate">
-        <Copy SourceFiles="$(OutputPath)reobfuscated/$(AssemblyName)-$(GameVersion).dll" DestinationFolder="$(AmongUs)/BepInEx/plugins/" />
+    <Target Name="Copy" AfterTargets="Build" Condition="'$(AmongUs)' != ''">
+        <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(AmongUs)/BepInEx/plugins/" />
     </Target>
 </Project>

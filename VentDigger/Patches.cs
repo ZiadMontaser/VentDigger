@@ -1,25 +1,25 @@
 ﻿using HarmonyLib;
 using System.Linq;
+using AdminLog.Utils;
 using UnityEngine;
 using Hazel;
-using Reactor.Extensions;
-using Reactor;
+using UnhollowerBaseLib;
 
 namespace VentDigger
 {
     class Patches
     {
-        const byte SpawnVentCallId = 62;
+        const byte RpcSpawnVentCallId = 40;
+        const byte CmdSpawnVentCallId = 41;
 
-        public static Button DigButton;
+        public static CooldownButton DigButton;
 
         public static Vent lastVent;
         static Vector2 VentSize;
 
-        private static void OnDigPressed()
+        private static bool OnDigPressed()
         {
             var pos = PlayerControl.LocalPlayer.transform.position;
-            var ventId = GetAvailableVentId();
             var ventLeft = int.MaxValue;
             var ventCenter = int.MaxValue;
             var ventRight = int.MaxValue;
@@ -29,7 +29,9 @@ namespace VentDigger
                 ventLeft = lastVent.Id;
             }
 
-            RpcSpawnVent(ventId, pos, pos.z + .001f, ventLeft, ventCenter, ventRight);
+            CmdSpawnVent(PlayerControl.LocalPlayer,pos, ventLeft, ventCenter, ventRight);
+
+            return true;
         }
 
         static int GetAvailableVentId()
@@ -46,18 +48,57 @@ namespace VentDigger
             }
         }
 
-        private static void SpawnVent(PlayerControl sender, int id, Vector2 position,float zAxis, int leftVent, int centerVent, int rightVent)
+        private static void CmdSpawnVent(PlayerControl spawnedBy, Vector2 position, int leftVent, int centerVent, int rightVent)
         {
-            var realPos = new Vector3(position.x, position.y, zAxis);
+            if (AmongUsClient.Instance.AmHost)
+            {
+                RpcSpawnVent(spawnedBy, GetAvailableVentId(), position, leftVent, centerVent, rightVent);
+            }
+            else
+            {
+                var w = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId,
+                    (byte) CmdSpawnVentCallId,
+                    SendOption.Reliable, AmongUsClient.Instance.HostId);
+                w.Write(position.x);
+                w.Write(position.y);
+                w.WritePacked(leftVent); //Left
+                w.WritePacked(centerVent); //Center
+                w.WritePacked(rightVent); //Right
+                AmongUsClient.Instance.FinishRpcImmediately(w);
 
-            var ventPref = Object.FindObjectOfType<Vent>();
+            }
+        }
+
+        private static void RpcSpawnVent(PlayerControl spawnedBy,int id, Vector2 position, int leftVent, int centerVent, int rightVent)
+        {
+            lastVent = SpawnVent(spawnedBy,id, position, leftVent, centerVent, rightVent);
+
+            var w = AmongUsClient.Instance.StartRpcImmediately(PlayerControl.LocalPlayer.NetId, (byte) RpcSpawnVentCallId,
+                SendOption.Reliable, -1);
+            w.Write(spawnedBy.PlayerId);
+            w.WritePacked(id);
+            w.Write(position.x);
+            w.Write(position.y);
+            w.WritePacked(leftVent); //Left
+            w.WritePacked(centerVent); //Center
+            w.WritePacked(rightVent); //Right
+            AmongUsClient.Instance.FinishRpcImmediately(w);
+        }
+        
+        private static Vent SpawnVent(PlayerControl spawnedBy, int id, Vector2 position, int leftVent, int centerVent, int rightVent)
+        {
+            var realPos = new Vector3(position.x, position.y, position.y / 1000 + 0.001f);
+
+            var ventPref = ShipStatus.Instance.AllVents[0];
             var vent = Object.Instantiate(ventPref, ventPref.transform.parent);
             vent.Id = id;
             vent.transform.position = realPos;
             vent.Left = leftVent == int.MaxValue ? null : ShipStatus.Instance.AllVents.FirstOrDefault(v => v.Id == leftVent);
             vent.Center = centerVent == int.MaxValue ? null : ShipStatus.Instance.AllVents.FirstOrDefault(v => v.Id == centerVent);
             vent.Right = rightVent == int.MaxValue ? null : ShipStatus.Instance.AllVents.FirstOrDefault(v => v.Id == rightVent);
-
+            
+            vent.gameObject.SetActive(true);
+            
             var allVents = ShipStatus.Instance.AllVents.ToList();
             allVents.Add(vent);
             ShipStatus.Instance.AllVents = allVents.ToArray();
@@ -67,25 +108,9 @@ namespace VentDigger
                 vent.Left.Right = ShipStatus.Instance.AllVents.FirstOrDefault(v => v.Id == id);
             }
 
-            if(sender.AmOwner)
-                lastVent = vent;
-        }
+            if (spawnedBy.AmOwner) lastVent = vent;
 
-        private static void RpcSpawnVent(int id, Vector2 position, float zAxis, int leftVent, int centerVent, int rightVent)
-        {
-
-            SpawnVent(PlayerControl.LocalPlayer, id, position, zAxis, leftVent, centerVent, rightVent);
-
-            var w = AmongUsClient.Instance.StartRpc(PlayerControl.LocalPlayer.NetId, (byte)SpawnVentCallId, SendOption.Reliable);
-
-            w.WritePacked(id);
-            w.Write(position);
-            w.Write(zAxis);
-            w.WritePacked(leftVent); //Left
-            w.WritePacked(centerVent); //Center
-            w.WritePacked(rightVent); //Right
-            w.EndMessage();
-
+            return vent;
         }
 
         [HarmonyPatch(typeof(HudManager), nameof(HudManager.Update))]
@@ -93,36 +118,33 @@ namespace VentDigger
         {
             static void Postfix()
             {
-                if (!PlayerControl.LocalPlayer) return;
-
-                var hits = Physics2D.OverlapBoxAll(PlayerControl.LocalPlayer.transform.position, VentSize, 0);
-                hits = hits.ToArray().Where((c) => (c.name.Contains("Vent") || !c.isTrigger) && c.gameObject.layer != 8 && c.gameObject.layer != 5).ToArray();
-                if (hits.Count() != 0)
+                if (!PlayerControl.LocalPlayer || !DigButton.IsAvailable) return;
+                
+                var circleHits = Physics2D.OverlapCircleAll(PlayerControl.LocalPlayer.transform.position, VentSize.y, Constants.ShipAndAllObjectsMask);
+                circleHits = circleHits.ToArray().Where((c) => (c.name.Contains("Vent") || !c.isTrigger) && c.gameObject.layer != 8 && c.gameObject.layer != 5).ToArray();
+                if (circleHits.Count() != 0)
                 {
-                    DigButton.buttonManager.renderer.color = Palette.DisabledColor;
-                    DigButton.CanPlace = false;
+                    DigButton.CanUse = false;
                 }
                 else
                 {
-                    DigButton.buttonManager.renderer.color = Palette.EnabledColor;
-                    DigButton.CanPlace = true;
+                    DigButton.CanUse = true;
                 }
             }
         }
 
-        [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.FixedUpdate))]
+        [HarmonyPatch(typeof(PlayerControl), nameof(PlayerControl.SetInfected))]
         class HandleThePLaceButton
         {
-            static void Prefix(PlayerControl __instance)
+            static void Postfix([HarmonyArgument(0)] Il2CppStructArray<byte> infected)
             {
-                if (!__instance.AmOwner) return;
-                if (PlayerControl.LocalPlayer.Data.IsImpostor && !PlayerControl.LocalPlayer.Data.IsDead)
+                if (infected.Contains(PlayerControl.LocalPlayer.PlayerId))
                 {
-                    DigButton.Enabled = (true);
+                    DigButton.OnClick = OnDigPressed;
                 }
                 else
                 {
-                    DigButton.Enabled = (false);
+                    DigButton.OnClick = null;
                 }
             }
         }
@@ -132,34 +154,64 @@ namespace VentDigger
         {
             private static bool Prefix(PlayerControl __instance, [HarmonyArgument(0)] byte callId, [HarmonyArgument(1)] MessageReader messageReader)
             {
-                if (callId != (byte)SpawnVentCallId) return true;
-                var reader = messageReader;
-                var id = reader.ReadPackedInt32();
-                var position = reader.ReadVector2();
-                var zAxis = reader.ReadSingle();
-                var leftVent = reader.ReadPackedInt32();
-                var centerVent = reader.ReadPackedInt32();
-                var rightVent = reader.ReadPackedInt32();
-                SpawnVent(
-                    sender: __instance,
-                    id: id,
-                    position: position,
-                    zAxis: zAxis,
-                    leftVent: leftVent,
-                    centerVent: centerVent,
-                    rightVent: rightVent
-                );
-                return false;
+                if (callId == CmdSpawnVentCallId)
+                {
+                    var reader = messageReader;
+                    var x = reader.ReadSingle();
+                    var y = reader.ReadSingle();
+                    var leftVent = reader.ReadPackedInt32();
+                    var centerVent = reader.ReadPackedInt32();
+                    var rightVent = reader.ReadPackedInt32();
+
+                    var pos = new Vector3(x, y, y / 1000 + 0.001f);
+
+                    CmdSpawnVent(
+                        spawnedBy: __instance,
+                        position: pos,
+                        leftVent: leftVent,
+                        centerVent: centerVent,
+                        rightVent: rightVent
+                    );
+                    return false;
+                }else if (callId == RpcSpawnVentCallId)
+                {
+                    var reader = messageReader;
+                    var spawnedBy = reader.ReadByte();
+                    var id = reader.ReadPackedInt32();
+                    var x = reader.ReadSingle();
+                    var y = reader.ReadSingle();
+                    var leftVent = reader.ReadPackedInt32();
+                    var centerVent = reader.ReadPackedInt32();
+                    var rightVent = reader.ReadPackedInt32();
+
+                    var pos = new Vector3(x, y, y / 1000 + 0.001f);
+
+                    SpawnVent(
+                        spawnedBy: GameData.Instance.GetPlayerById(spawnedBy).Object,
+                        id: id,
+                        position: pos,
+                        leftVent: leftVent,
+                        centerVent: centerVent,
+                        rightVent: rightVent
+                    );
+                    return false;
+                }
+                
+                
+                return true;
             }
         }
-
-        [HarmonyPatch(typeof(HudManager),nameof(HudManager.Start))]
+        
+        [HarmonyPatch(typeof(HudManager), nameof(HudManager.Start))]
         static class DigButtonPatch
         {
-            [HarmonyPostfix] static void Postfix(HudManager __instance)
+            [HarmonyPostfix]
+            static void Postfix(HudManager __instance)
             {
-                DigButton = new Button(__instance, "VentDigger.Assets.DigImpostor.png");
-                DigButton.AddListener(OnDigPressed);
+                DigButton = new CooldownButton("DigButton");
+                DigButton.InitCooldown = 5;
+                DigButton.NormalCooldown = 15;
+                DigButton.Sprite = SpriteHelper.LoadSpriteFromEmbeddedResources("VentDigger.Assets.DigImpostor.png", 700);
             }
         }
 
@@ -168,20 +220,17 @@ namespace VentDigger
         {
             static void Prefix(ShipStatus __instance)
             {
-                var vents = GameObject.FindObjectsOfType<Vent>();
-                bool first = true;
-                foreach (var vent in vents)
+                var vents = ShipStatus.Instance.AllVents;
+                for (var i = 1; i < vents.Count; i++)
                 {
-                    if (first)
-                    {
-                        first = false;
-                        vent.transform.position = new Vector2(50, 50);
-                        VentSize = Vector2.Scale(vent.GetComponent<BoxCollider2D>().size, vent.transform.localScale) * 0.75f;
-                        continue;
-                    }
-                    GameObject.Destroy(vent.gameObject);
+                    GameObject.Destroy(vents[i].gameObject);
                 }
-                __instance.AllVents = new Vent[0];
+
+                vents[0].Id = -1;
+                vents[0].gameObject.SetActive(false);
+                VentSize = Vector2.Scale(vents[0].GetComponent<BoxCollider2D>().size, vents[0].transform.localScale) * 0.75f;
+
+                __instance.AllVents = new Vent[]{vents[0]};
             }
         }
 
@@ -191,7 +240,16 @@ namespace VentDigger
             static void Postfix(PingTracker __instance)
             {
                 __instance.gameObject.SetActive(true);
-                __instance.text.Text += "\n\n >>Made by [FF0000FF]Zirno#9723";
+                __instance.text.text += "\n\n >>Made by Zirno#9723";
+            }
+        }
+
+        [HarmonyPatch(typeof(VersionShower), nameof(VersionShower.Start))]
+        static class VersionShowerPatches
+        {
+            static void Postfix(PingTracker __instance)
+            {
+                __instance.text.text += $" || <color=\"red\"> VentDigger {VentDiggerPlugin.version} </color>";
             }
         }
     }
